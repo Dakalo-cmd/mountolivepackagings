@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MountOlive Admin Dashboard</title>
 
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -86,7 +89,6 @@ th, td {
 
 <div class="container">
 
-<!-- ADD STOCK -->
 <div class="card">
   <h3>Add Stock</h3>
   <input id="itemName" placeholder="Name">
@@ -97,7 +99,6 @@ th, td {
   <button onclick="addStock()">Add</button>
 </div>
 
-<!-- IMPORT / EXPORT -->
 <div class="card">
   <h3>Import / Export</h3>
   <input type="file" id="fileInput">
@@ -108,14 +109,12 @@ th, td {
   <button onclick="exportMonthlyHistory()">Export Monthly History</button>
 </div>
 
-<!-- SEARCH -->
 <div class="card">
   <h3>Search Stock</h3>
   <input type="text" id="searchBox" placeholder="Search..." onkeyup="filterStock()">
   <button onclick="resetSearch()">Reset Search</button>
 </div>
 
-<!-- STOCK TABLE -->
 <div class="card">
   <h3>Stock List</h3>
 
@@ -135,7 +134,6 @@ th, td {
   </table>
 </div>
 
-<!-- HISTORY -->
 <div class="card">
   <h3>Stock History</h3>
   <table>
@@ -166,6 +164,27 @@ const db = createClient(
 let stockData = [];
 let excelPreviewData = [];
 
+/* ---------------- PWA INSTALL ---------------- */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+/* ---------------- LOAD SAVED EXCEL ---------------- */
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem("excelPreviewData");
+  if (saved) {
+    excelPreviewData = JSON.parse(saved);
+    if (excelPreviewData.length > 0) {
+      renderExcelPreview(excelPreviewData);
+    }
+  }
+});
+
+/* ---------------- SAVE TO STORAGE ---------------- */
+function savePreviewToStorage() {
+  localStorage.setItem("excelPreviewData", JSON.stringify(excelPreviewData));
+}
+
 /* ---------------- LOGIN ---------------- */
 async function login() {
   const { error } = await db.auth.signInWithPassword({
@@ -188,152 +207,27 @@ async function logout() {
   location.reload();
 }
 
-/* ---------------- ADD STOCK ---------------- */
-async function addStock() {
-
-  await db.from("stocks").insert([{
-    name: itemName.value,
-    ref: itemRef.value,
-    supplier: itemSupplier.value,
-    size: itemSize.value,
-    qty_stock_available: parseInt(qtyStock.value) || 0,
-    qty_on_order: 0,
-    last_ordered: 0
-  }]);
-
-  itemName.value = "";
-  itemRef.value = "";
-  itemSupplier.value = "";
-  itemSize.value = "";
-  qtyStock.value = "";
-
-  loadStock();
-}
-
-/* ---------------- LOAD STOCK ---------------- */
+/* ---------------- STOCK ---------------- */
 async function loadStock() {
   const { data } = await db.from("stocks").select("*");
-
-  stockData = data;
-  renderStock(data);
-}
-
-/* ---------------- RENDER ---------------- */
-function renderStock(data) {
-
-  stockTable.innerHTML = "";
-
-  data.forEach(item => {
-
-    const info = item.last_ordered > 0
-      ? `${item.qty_stock_available + item.last_ordered} → ${item.last_ordered} ordered → ${item.qty_stock_available} available`
-      : "No order";
-
-    stockTable.innerHTML += `
-      <tr>
-        <td><input id="n${item.id}" value="${item.name || ""}"></td>
-        <td><input id="r${item.id}" value="${item.ref || ""}"></td>
-        <td><input id="s${item.id}" value="${item.supplier || ""}"></td>
-
-        <td><input id="a${item.id}" value="${item.qty_stock_available}" type="number"></td>
-        <td><input id="o${item.id}" value="0" type="number"></td>
-
-        <td>${info}</td>
-
-        <td>
-          <button onclick="updateStock('${item.id}')">Update</button>
-          <button onclick="deleteStock('${item.id}')">Delete</button>
-        </td>
-      </tr>
-    `;
-  });
-}
-
-/* ---------------- SEARCH ---------------- */
-function filterStock() {
-
-  const val = searchBox.value.toLowerCase();
-
-  const filtered = stockData.filter(i =>
-    (i.name || "").toLowerCase().includes(val) ||
-    (i.ref || "").toLowerCase().includes(val) ||
-    (i.supplier || "").toLowerCase().includes(val)
-  );
-
-  renderStock(filtered);
-}
-
-function resetSearch() {
-  searchBox.value = "";
+  stockData = data || [];
   renderStock(stockData);
-}
-
-/* ---------------- UPDATE ---------------- */
-async function updateStock(id) {
-
-  const name = document.getElementById("n"+id).value;
-  const ref = document.getElementById("r"+id).value;
-  const supplier = document.getElementById("s"+id).value;
-
-  const available = parseInt(document.getElementById("a"+id).value) || 0;
-  const order = parseInt(document.getElementById("o"+id).value) || 0;
-
-  let newAvailable = available;
-
-  if (order > 0) {
-
-    if (order > available) return alert("Order cannot exceed stock");
-
-    newAvailable = available - order;
-
-    const { data: current } = await db
-      .from("stocks")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    await db.from("stock_history").insert([{
-      stock_id: id,
-      name: current.name,
-      qty_before: available,
-      qty_ordered: order,
-      qty_after: newAvailable
-    }]);
-  }
-
-  await db.from("stocks").update({
-    name,
-    ref,
-    supplier,
-    qty_stock_available: newAvailable,
-    last_ordered: order
-  }).eq("id", id);
-
-  loadStock();
-  loadHistory();
-}
-
-/* ---------------- DELETE ---------------- */
-async function deleteStock(id) {
-  await db.from("stocks").delete().eq("id", id);
-  loadStock();
 }
 
 /* ---------------- HISTORY ---------------- */
 async function loadHistory() {
-
-  const { data } = await db.from("stock_history").select("*");
+  const { data } = await db.from("stock_history").select("*").order("created_at", { ascending: false });
 
   historyTable.innerHTML = "";
 
-  data.forEach(h => {
+  (data || []).forEach(h => {
     historyTable.innerHTML += `
       <tr>
         <td>${h.name}</td>
         <td>${h.qty_before}</td>
         <td>${h.qty_ordered}</td>
         <td>${h.qty_after}</td>
-        <td>${h.created_at ? new Date(h.created_at).toLocaleString() : ""}</td>
+        <td>${new Date(h.created_at).toLocaleString()}</td>
       </tr>
     `;
   });
@@ -341,14 +235,12 @@ async function loadHistory() {
 
 /* ---------------- EXCEL PREVIEW ---------------- */
 function previewExcel() {
-
   const file = fileInput.files[0];
   if (!file) return alert("Select Excel file");
 
   const reader = new FileReader();
 
   reader.onload = function(e) {
-
     const data = new Uint8Array(e.target.result);
     const wb = XLSX.read(data, { type: "array" });
 
@@ -356,42 +248,96 @@ function previewExcel() {
     const rows = XLSX.utils.sheet_to_json(sheet);
 
     excelPreviewData = rows;
+    savePreviewToStorage();   // ✅ SAVE HERE
     renderExcelPreview(rows);
   };
 
   reader.readAsArrayBuffer(file);
 }
 
-/* FIXED PREVIEW */
+/* ---------------- RENDER PREVIEW ---------------- */
 function renderExcelPreview(rows) {
-
   stockTable.innerHTML = "";
 
   rows.forEach((r, i) => {
 
     stockTable.innerHTML += `
       <tr>
-        <td><input id="ex_name_${i}" value="${r.Name || r.name || ""}"></td>
-        <td><input id="ex_ref_${i}" value="${r.Ref || r.ref || ""}"></td>
-        <td><input id="ex_supplier_${i}" value="${r.Supplier || r.supplier || ""}"></td>
-
-        <td><input id="ex_available_${i}" value="${r.Available || r.available || 0}" type="number"></td>
+        <td><input id="ex_name_${i}" value="${r.Name || r['Item Name'] || ""}"></td>
+        <td><input id="ex_ref_${i}" value="${r.Ref || r.Reference || ""}"></td>
+        <td><input id="ex_supplier_${i}" value="${r.Supplier || ""}"></td>
+        <td><input id="ex_available_${i}" value="${r.Available || 0}" type="number"></td>
 
         <td>—</td>
-        <td>Excel Preview</td>
+        <td>Preview</td>
 
-        <td><button onclick="removeExcelRow(${i})">Remove</button></td>
+        <td>
+            <button onclick="updateExcelRow(${i})">Update</button>
+            <button onclick="removeExcelRow(${i})">Remove</button>
+        </td>
       </tr>
     `;
   });
 }
 
+/* ---------------- REMOVE ROW ---------------- */
 function removeExcelRow(i) {
   excelPreviewData.splice(i, 1);
+  savePreviewToStorage(); // ✅ SAVE
   renderExcelPreview(excelPreviewData);
 }
 
-/* ---------------- SAVE EXCEL ---------------- */
+/* ---------------- UPDATE ROW ---------------- */
+async function updateExcelRow(i) {
+
+  const name = document.getElementById("ex_name_"+i).value;
+  const ref = document.getElementById("ex_ref_"+i).value;
+  const supplier = document.getElementById("ex_supplier_"+i).value;
+  const available = parseInt(document.getElementById("ex_available_"+i).value) || 0;
+
+  if (!name || !ref) return alert("Name and Ref required");
+
+  const { data: existing } = await db
+    .from("stocks")
+    .select("*")
+    .eq("ref", ref)
+    .single();
+
+  if (existing) {
+
+    await db.from("stock_history").insert([{
+      stock_id: existing.id,
+      name: existing.name,
+      qty_before: existing.qty_stock_available,
+      qty_ordered: 0,
+      qty_after: available
+    }]);
+
+    await db.from("stocks").update({
+      name,
+      supplier,
+      qty_stock_available: available,
+      last_ordered: 0
+    }).eq("id", existing.id);
+
+  } else {
+
+    await db.from("stocks").insert([{
+      name,
+      ref,
+      supplier,
+      qty_stock_available: available,
+      qty_on_order: 0,
+      last_ordered: 0
+    }]);
+  }
+
+  alert("Updated ✅");
+  loadStock();
+  loadHistory();
+}
+
+/* ---------------- SAVE ALL ---------------- */
 async function saveExcelToDB() {
 
   for (let i = 0; i < excelPreviewData.length; i++) {
@@ -401,21 +347,35 @@ async function saveExcelToDB() {
     const supplier = document.getElementById("ex_supplier_"+i).value;
     const available = parseInt(document.getElementById("ex_available_"+i).value) || 0;
 
-    if (!name || !ref) continue;
+    const { data: existing } = await db
+      .from("stocks")
+      .select("*")
+      .eq("ref", ref)
+      .single();
 
-    await db.from("stocks").upsert([{
-      name,
-      ref,
-      supplier,
-      qty_stock_available: available,
-      qty_on_order: 0,
-      last_ordered: 0
-    }], { onConflict: "ref" });
+    if (existing) {
+      await db.from("stocks").update({
+        name,
+        supplier,
+        qty_stock_available: available
+      }).eq("id", existing.id);
+
+    } else {
+      await db.from("stocks").insert([{
+        name,
+        ref,
+        supplier,
+        qty_stock_available: available
+      }]);
+    }
   }
 
-  alert("Saved successfully");
+  alert("Saved ✅");
+
   excelPreviewData = [];
+  localStorage.removeItem("excelPreviewData"); // clear saved
   loadStock();
+  loadHistory();
 }
 </script>
 
