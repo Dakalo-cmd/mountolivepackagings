@@ -288,55 +288,67 @@ function removeExcelRow(i) {
 }
 
 /* ---------------- UPDATE ROW ---------------- */
-async function updateExcelRow(i) {
+async function updateStock(id) {
 
-  const name = document.getElementById("ex_name_"+i).value;
-  const ref = document.getElementById("ex_ref_"+i).value;
-  const supplier = document.getElementById("ex_supplier_"+i).value;
-  const available = parseInt(document.getElementById("ex_available_"+i).value) || 0;
+  const name = document.getElementById("n"+id).value;
+  const ref = document.getElementById("r"+id).value;
+  const supplier = document.getElementById("s"+id).value;
 
-  if (!name || !ref) return alert("Name and Ref required");
+  const availableInput = parseInt(document.getElementById("a"+id).value) || 0;
+  const orderQty = parseInt(document.getElementById("o"+id).value) || 0;
 
-  const { data: existing } = await db
+  // Get current stock from DB
+  const { data: existing, error } = await db
     .from("stocks")
     .select("*")
-    .eq("ref", ref)
+    .eq("id", id)
     .single();
 
-  if (existing) {
-
-    await db.from("stock_history").insert([{
-      stock_id: existing.id,
-      name: existing.name,
-      qty_before: existing.qty_stock_available,
-      qty_ordered: 0,
-      qty_after: available
-    }]);
-
-    await db.from("stocks").update({
-      name,
-      supplier,
-      qty_stock_available: available,
-      last_ordered: 0
-    }).eq("id", existing.id);
-
-  } else {
-
-    await db.from("stocks").insert([{
-      name,
-      ref,
-      supplier,
-      qty_stock_available: available,
-      qty_on_order: 0,
-      last_ordered: 0
-    }]);
+  if (error || !existing) {
+    return alert("Stock not found");
   }
 
-  alert("Updated ✅");
+  let qtyBefore = existing.qty_stock_available;
+  let qtyAfter = qtyBefore;
+
+  // 🔥 APPLY ORDER LOGIC
+  if (orderQty > 0) {
+
+    if (orderQty > qtyBefore) {
+      return alert("Order cannot be more than available stock!");
+    }
+
+    qtyAfter = qtyBefore - orderQty;
+
+    // SAVE HISTORY
+    await db.from("stock_history").insert([{
+      stock_id: id,
+      name: existing.name,
+      qty_before: qtyBefore,
+      qty_ordered: orderQty,
+      qty_after: qtyAfter
+    }]);
+
+  } else {
+    // If no order, just manual update
+    qtyAfter = availableInput;
+  }
+
+  // UPDATE STOCK
+  await db.from("stocks").update({
+    name,
+    ref,
+    supplier,
+    qty_stock_available: qtyAfter,
+    last_ordered: orderQty
+  }).eq("id", id);
+
+  alert("Stock updated ✅");
+
+  // Reload data
   loadStock();
   loadHistory();
 }
-
 /* ---------------- SAVE ALL ---------------- */
 async function saveExcelToDB() {
 
