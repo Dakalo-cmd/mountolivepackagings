@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MountOlive Admin Dashboard</title>
 
-<!-- PWA -->
 <link rel="manifest" href="manifest.json">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,7 +12,6 @@
 
 <style>
 body { font-family: Arial; margin: 0; background: #1f8f4e; color: #b88a4a; }
-
 header {
   background: #1f8f4e;
   padding: 15px;
@@ -22,11 +20,8 @@ header {
   align-items: center;
   border-bottom: 2px solid #b88a4a;
 }
-
 .logo { height: 45px; }
-
 .container { padding: 15px; }
-
 .card {
   background: white;
   padding: 15px;
@@ -34,33 +29,24 @@ header {
   border-radius: 10px;
   color: #6b4226;
 }
-
 input, button {
   padding: 10px;
   margin: 5px 0;
   border-radius: 5px;
   width: 100%;
-  box-sizing: border-box;
 }
-
 button {
   background: #b88a4a;
   color: white;
   border: none;
   cursor: pointer;
 }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
+table { width: 100%; border-collapse: collapse; }
 th, td {
   border: 1px solid #ddd;
   padding: 10px;
   text-align: center;
 }
-
 .hidden { display: none; }
 </style>
 </head>
@@ -90,34 +76,7 @@ th, td {
 <div class="container">
 
 <div class="card">
-  <h3>Add Stock</h3>
-  <input id="itemName" placeholder="Name">
-  <input id="itemRef" placeholder="Ref Nr">
-  <input id="itemSupplier" placeholder="Supplier">
-  <input id="itemSize" placeholder="Size">
-  <input id="qtyStock" type="number" placeholder="Qty Stock Available">
-  <button onclick="addStock()">Add</button>
-</div>
-
-<div class="card">
-  <h3>Import / Export</h3>
-  <input type="file" id="fileInput">
-
-  <button onclick="previewExcel()">Preview Excel</button>
-  <button onclick="saveExcelToDB()">Save To Database</button> 
-  <button onclick="exportExcel()">Export Excel</button>
-  <button onclick="exportMonthlyHistory()">Export Monthly History</button>
-</div>
-
-<div class="card">
-  <h3>Search Stock</h3>
-  <input type="text" id="searchBox" placeholder="Search..." onkeyup="filterStock()">
-  <button onclick="resetSearch()">Reset Search</button>
-</div>
-
-<div class="card">
   <h3>Stock List</h3>
-
   <table>
     <thead>
       <tr>
@@ -161,31 +120,7 @@ const db = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrdHp1cXN0eHl4dWdydmZ5YWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2Njk4NjgsImV4cCI6MjA5MTI0NTg2OH0.2yNTKezSwCu3K0IFod-oLiXK-behvsOObEhY9vWeBRM"
 );
 
-let stockData = [];
-let excelPreviewData = [];
-
-/* ---------------- PWA INSTALL ---------------- */
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
-}
-
-/* ---------------- LOAD SAVED EXCEL ---------------- */
-window.addEventListener("load", () => {
-  const saved = localStorage.getItem("excelPreviewData");
-  if (saved) {
-    excelPreviewData = JSON.parse(saved);
-    if (excelPreviewData.length > 0) {
-      renderExcelPreview(excelPreviewData);
-    }
-  }
-});
-
-/* ---------------- SAVE TO STORAGE ---------------- */
-function savePreviewToStorage() {
-  localStorage.setItem("excelPreviewData", JSON.stringify(excelPreviewData));
-}
-
-/* ---------------- LOGIN ---------------- */
+/* LOGIN */
 async function login() {
   const { error } = await db.auth.signInWithPassword({
     email: email.value,
@@ -201,20 +136,19 @@ async function login() {
   loadHistory();
 }
 
-/* ---------------- LOGOUT ---------------- */
+/* LOGOUT */
 async function logout() {
   await db.auth.signOut();
   location.reload();
 }
 
-/* ---------------- STOCK ---------------- */
+/* LOAD STOCK */
 async function loadStock() {
   const { data } = await db.from("stocks").select("*");
-  stockData = data || [];
-  renderStock(stockData);
+  renderStock(data || []);
 }
 
-/* ---------------- HISTORY ---------------- */
+/* LOAD HISTORY */
 async function loadHistory() {
   const { data } = await db.from("stock_history").select("*").order("created_at", { ascending: false });
 
@@ -233,61 +167,36 @@ async function loadHistory() {
   });
 }
 
-/* ---------------- EXCEL PREVIEW ---------------- */
-function previewExcel() {
-  const file = fileInput.files[0];
-  if (!file) return alert("Select Excel file");
-
-  const reader = new FileReader();
-
-  reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const wb = XLSX.read(data, { type: "array" });
-
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet);
-
-    excelPreviewData = rows;
-    savePreviewToStorage();   // ✅ SAVE HERE
-    renderExcelPreview(rows);
-  };
-
-  reader.readAsArrayBuffer(file);
-}
-
-/* ---------------- RENDER PREVIEW ---------------- */
-function renderExcelPreview(rows) {
+/* RENDER STOCK */
+function renderStock(data) {
   stockTable.innerHTML = "";
 
-  rows.forEach((r, i) => {
+  data.forEach(item => {
+
+    const info = item.last_ordered > 0
+      ? `${item.qty_stock_available + item.last_ordered} → ${item.last_ordered} ordered → ${item.qty_stock_available}`
+      : "No order";
 
     stockTable.innerHTML += `
       <tr>
-        <td><input id="ex_name_${i}" value="${r.Name || r['Item Name'] || ""}"></td>
-        <td><input id="ex_ref_${i}" value="${r.Ref || r.Reference || ""}"></td>
-        <td><input id="ex_supplier_${i}" value="${r.Supplier || ""}"></td>
-        <td><input id="ex_available_${i}" value="${r.Available || 0}" type="number"></td>
+        <td><input id="n${item.id}" value="${item.name}"></td>
+        <td><input id="r${item.id}" value="${item.ref}"></td>
+        <td><input id="s${item.id}" value="${item.supplier || ""}"></td>
 
-        <td>—</td>
-        <td>Preview</td>
+        <td><input id="a${item.id}" value="${item.qty_stock_available}" type="number"></td>
+        <td><input id="o${item.id}" value="0" type="number"></td>
+
+        <td>${info}</td>
 
         <td>
-            <button onclick="updateExcelRow(${i})">Update</button>
-            <button onclick="removeExcelRow(${i})">Remove</button>
+          <button onclick="updateStock('${item.id}')">Update</button>
         </td>
       </tr>
     `;
   });
 }
 
-/* ---------------- REMOVE ROW ---------------- */
-function removeExcelRow(i) {
-  excelPreviewData.splice(i, 1);
-  savePreviewToStorage(); // ✅ SAVE
-  renderExcelPreview(excelPreviewData);
-}
-
-/* ---------------- UPDATE ROW ---------------- */
+/* UPDATE STOCK (MAIN LOGIC) */
 async function updateStock(id) {
 
   const name = document.getElementById("n"+id).value;
@@ -297,30 +206,23 @@ async function updateStock(id) {
   const availableInput = parseInt(document.getElementById("a"+id).value) || 0;
   const orderQty = parseInt(document.getElementById("o"+id).value) || 0;
 
-  // Get current stock from DB
-  const { data: existing, error } = await db
+  const { data: existing } = await db
     .from("stocks")
     .select("*")
     .eq("id", id)
     .single();
 
-  if (error || !existing) {
-    return alert("Stock not found");
-  }
-
   let qtyBefore = existing.qty_stock_available;
   let qtyAfter = qtyBefore;
 
-  // 🔥 APPLY ORDER LOGIC
   if (orderQty > 0) {
 
     if (orderQty > qtyBefore) {
-      return alert("Order cannot be more than available stock!");
+      return alert("Order exceeds stock!");
     }
 
     qtyAfter = qtyBefore - orderQty;
 
-    // SAVE HISTORY
     await db.from("stock_history").insert([{
       stock_id: id,
       name: existing.name,
@@ -330,11 +232,10 @@ async function updateStock(id) {
     }]);
 
   } else {
-    // If no order, just manual update
+    qtyBefore = availableInput;
     qtyAfter = availableInput;
   }
 
-  // UPDATE STOCK
   await db.from("stocks").update({
     name,
     ref,
@@ -343,49 +244,11 @@ async function updateStock(id) {
     last_ordered: orderQty
   }).eq("id", id);
 
-  alert("Stock updated ✅");
+  // reset order field
+  document.getElementById("o"+id).value = 0;
 
-  // Reload data
-  loadStock();
-  loadHistory();
-}
-/* ---------------- SAVE ALL ---------------- */
-async function saveExcelToDB() {
+  alert("Updated ✅");
 
-  for (let i = 0; i < excelPreviewData.length; i++) {
-
-    const name = document.getElementById("ex_name_"+i).value;
-    const ref = document.getElementById("ex_ref_"+i).value;
-    const supplier = document.getElementById("ex_supplier_"+i).value;
-    const available = parseInt(document.getElementById("ex_available_"+i).value) || 0;
-
-    const { data: existing } = await db
-      .from("stocks")
-      .select("*")
-      .eq("ref", ref)
-      .single();
-
-    if (existing) {
-      await db.from("stocks").update({
-        name,
-        supplier,
-        qty_stock_available: available
-      }).eq("id", existing.id);
-
-    } else {
-      await db.from("stocks").insert([{
-        name,
-        ref,
-        supplier,
-        qty_stock_available: available
-      }]);
-    }
-  }
-
-  alert("Saved ✅");
-
-  excelPreviewData = [];
-  localStorage.removeItem("excelPreviewData"); // clear saved
   loadStock();
   loadHistory();
 }
