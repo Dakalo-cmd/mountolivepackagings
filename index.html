@@ -436,7 +436,47 @@ async function saveExcelToDB() {
 
   loadStock();
   loadHistory();
+ 
 }
+
+/* ---------------- SEARCH FIX (JUMP TO ROW BY NAME OR REF) ---------------- */
+function filterStock() {
+  const value = document.getElementById("searchBox").value.toLowerCase().trim();
+  const rows = document.querySelectorAll("#stockTable tr");
+
+  let found = null;
+
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll("input");
+
+    const name = (inputs[0]?.value || "").toLowerCase();
+    const ref = (inputs[1]?.value || "").toLowerCase();
+
+    if (name.includes(value) || ref.includes(value)) {
+      row.style.display = "";
+      if (!found) found = row;
+    } else {
+      row.style.display = "none";
+    }
+  });
+
+  // highlight + scroll to match
+  if (found && value !== "") {
+    found.scrollIntoView({ behavior: "smooth", block: "center" });
+    found.style.background = "#fff3a0";
+
+    setTimeout(() => {
+      found.style.background = "";
+    }, 1200);
+  }
+}
+
+/* ---------------- ENTER KEY SUPPORT ---------------- */
+document.getElementById("searchBox").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") {
+    filterStock();
+  }
+});
 </script>
 
 </body>
