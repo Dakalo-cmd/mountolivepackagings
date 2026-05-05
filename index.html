@@ -147,7 +147,7 @@ async function logout() {
   location.reload();
 }
 
-/* ADD STOCK (FIXED) */
+/* ADD STOCK */
 async function addStock() {
 
   const name = itemName.value.trim();
@@ -160,47 +160,48 @@ async function addStock() {
     return alert("⚠️ Fill ALL fields correctly");
   }
 
-  // 🔥 INSERT STOCK FIRST
   const { data, error } = await db.from("stocks").insert([{
     name,
     ref,
     supplier,
     size,
     qty_stock_available: qty
-  }]).select(); // ✅ IMPORTANT (we need the ID)
+  }]).select();
 
   if (error) return alert(error.message);
 
   const newStock = data[0];
 
-  // 🔥 NOW SAVE HISTORY (THIS IS THE NEW PART)
   await db.from("stock_history").insert([{
     stock_id: newStock.id,
-    name: name,
+    name,
     qty_before: 0,
     qty_ordered: 0,
     qty_after: qty
   }]);
 
-  alert("Stock added + history saved ✅");
-
-  itemName.value = "";
-  itemRef.value = "";
-  itemSupplier.value = "";
-  itemSize.value = "";
-  qtyStock.value = "";
-
   loadStock();
-  loadHistory(); // ✅ refresh history table
+  loadHistory();
 }
+
 /* LOAD STOCK */
 async function loadStock() {
+
+  // 🔥 RESTORE EXCEL PREVIEW IF EXISTS
+  const saved = localStorage.getItem("excelPreview");
+
+  if (saved) {
+    excelPreviewData = JSON.parse(saved);
+    renderExcelPreview(excelPreviewData);
+    return;
+  }
+
   const { data } = await db.from("stocks").select("*");
   stockData = data || [];
   renderStock(stockData);
 }
 
-/* RENDER STOCK */
+/* NORMAL STOCK */
 function renderStock(data) {
   stockTable.innerHTML = "";
 
@@ -213,34 +214,22 @@ function renderStock(data) {
         <td><input id="a${item.id}" type="number" value="${item.qty_stock_available || 0}"></td>
         <td><input id="o${item.id}" type="number" value="0"></td>
         <td><input id="z${item.id}" value="${item.size || ""}"></td>
-       <td>
-         <button onclick="updateStock('${item.id}')">Update</button>
-         <button onclick="deleteStock('${item.id}')" style="background:red;margin-top:5px;">Delete</button>
-       </td>
+        <td>
+          <button onclick="updateStock('${item.id}')">Update</button>
+          <button onclick="deleteStock('${item.id}')" style="background:red;margin-top:5px;">Delete</button>
+        </td>
       </tr>
     `;
   });
 }
 
+/* DELETE */
 async function deleteStock(id) {
-
-  const confirmDelete = confirm("Delete this stock?");
-
-  if (!confirmDelete) return;
-
-  const { error } = await db.from("stocks").delete().eq("id", id);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  alert("Deleted ✅");
-
+  await db.from("stocks").delete().eq("id", id);
   loadStock();
 }
 
-/* UPDATE STOCK (FIXED + HISTORY) */
+/* UPDATE STOCK */
 async function updateStock(id) {
 
   const name = document.getElementById("n"+id).value.trim();
@@ -248,51 +237,37 @@ async function updateStock(id) {
   const supplier = document.getElementById("s"+id).value.trim();
   const size = document.getElementById("z"+id).value.trim();
 
-  const availableInput = parseInt(document.getElementById("a"+id).value) || 0;
-  const orderQty = parseInt(document.getElementById("o"+id).value) || 0;
-
-  if (!name || !ref || !supplier || !size) {
-    return alert("All fields required");
-  }
+  const available = parseInt(document.getElementById("a"+id).value) || 0;
+  const order = parseInt(document.getElementById("o"+id).value) || 0;
 
   const { data: existing } = await db.from("stocks").select("*").eq("id", id).single();
 
-  let qtyBefore = existing.qty_stock_available;
-  let qtyAfter = qtyBefore;
+  let qtyAfter = available;
 
-  if (orderQty > 0) {
+  if (order > 0) {
+    if (order > existing.qty_stock_available) return alert("Order too high");
 
-    if (orderQty > qtyBefore) {
-      return alert("Order too high!");
-    }
-
-    qtyAfter = qtyBefore - orderQty;
+    qtyAfter = existing.qty_stock_available - order;
 
     await db.from("stock_history").insert([{
       stock_id: id,
       name,
-      qty_before: qtyBefore,
-      qty_ordered: orderQty,
+      qty_before: existing.qty_stock_available,
+      qty_ordered: order,
       qty_after: qtyAfter
     }]);
-
-  } else {
-    qtyAfter = availableInput;
   }
 
   await db.from("stocks").update({
     name, ref, supplier, size,
-    qty_stock_available: qtyAfter,
-    last_ordered: orderQty
+    qty_stock_available: qtyAfter
   }).eq("id", id);
-
-  alert("Updated ✅");
 
   loadStock();
   loadHistory();
 }
 
-/* LOAD HISTORY */
+/* HISTORY */
 async function loadHistory() {
   const { data } = await db.from("stock_history").select("*").order("created_at", { ascending: false });
 
@@ -327,6 +302,152 @@ function filterStock() {
 function resetSearch() {
   searchBox.value = "";
   document.querySelectorAll("#stockTable tr").forEach(r => r.style.display = "");
+}
+
+/* EXCEL PREVIEW */
+function previewExcel() {
+
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) return alert("Select Excel file");
+
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+
+    excelPreviewData = rows;
+
+    // 🔥 SAVE FOR REFRESH
+    localStorage.setItem("excelPreview", JSON.stringify(rows));
+
+    renderExcelPreview(rows);
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+/* RENDER EXCEL (WITH ALL BUTTONS BACK) */
+function renderExcelPreview(rows) {
+
+  stockTable.innerHTML = "";
+
+  rows.forEach((r, i) => {
+
+    stockTable.innerHTML += `
+      <tr>
+        <td><input id="ex_name_${i}" value="${r.Name || ""}"></td>
+        <td><input id="ex_ref_${i}" value="${r.Ref || ""}"></td>
+        <td><input id="ex_supplier_${i}" value="${r.Supplier || ""}"></td>
+        <td><input id="ex_available_${i}" type="number" value="${r.Available || 0}"></td>
+        <td><input id="ex_order_${i}" type="number" value="0"></td>
+        <td><input id="ex_size_${i}" value="${r.Size || ""}"></td>
+        <td>
+          <button onclick="updatePreviewRow(${i})">Update</button>
+          <button onclick="deletePreviewRow(${i})" style="background:red;margin-top:5px;">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+/* UPDATE PREVIEW (CLEAN + SAVE STOCK + HISTORY ONCE) */
+async function updatePreviewRow(i) {
+
+  const available = parseInt(document.getElementById("ex_available_" + i).value) || 0;
+  const order = parseInt(document.getElementById("ex_order_" + i).value) || 0;
+
+  if (order > available) return alert("Order too high");
+
+  const newVal = available - order;
+
+  document.getElementById("ex_available_" + i).value = newVal;
+
+  excelPreviewData[i].Available = newVal;
+  localStorage.setItem("excelPreview", JSON.stringify(excelPreviewData));
+
+  const name = document.getElementById("ex_name_" + i).value;
+  const ref = document.getElementById("ex_ref_" + i).value;
+
+  // get real stock
+  const { data: existing } = await db
+    .from("stocks")
+    .select("*")
+    .eq("ref", ref)
+    .maybeSingle();
+
+  if (!existing) {
+    alert("Stock not found in database");
+    return;
+  }
+
+  const qty_before = existing.qty_stock_available;
+
+  const finalQty = qty_before - order;
+
+  if (finalQty < 0) {
+    return alert("Not enough stock in database");
+  }
+
+  // update stock
+  await db.from("stocks")
+    .update({
+      qty_stock_available: finalQty
+    })
+    .eq("id", existing.id);
+
+  // insert history ONLY ONCE
+  await db.from("stock_history").insert([{
+    stock_id: existing.id,
+    name,
+    qty_before,
+    qty_ordered: order,
+    qty_after: finalQty
+  }]);
+}
+/* DELETE PREVIEW */
+function deletePreviewRow(i) {
+  excelPreviewData.splice(i, 1);
+  localStorage.setItem("excelPreview", JSON.stringify(excelPreviewData));
+  renderExcelPreview(excelPreviewData);
+}
+
+/* SAVE EXCEL */
+async function saveExcelToDB() {
+
+  for (let i = 0; i < excelPreviewData.length; i++) {
+
+    const name = document.getElementById("ex_name_"+i).value;
+    const ref = document.getElementById("ex_ref_"+i).value;
+    const supplier = document.getElementById("ex_supplier_"+i).value;
+    const available = parseInt(document.getElementById("ex_available_"+i).value) || 0;
+
+    if (!name || !ref) continue;
+
+    await db.from("stocks").upsert([{
+      name,
+      ref,
+      supplier,
+      size: "",
+      qty_stock_available: available
+    }], { onConflict: "ref" });
+	
+await db.from("stock_history").insert([{
+  stock_id: null, // or fetch real ID if you want linking
+  name,
+  qty_before: 0,
+  qty_ordered: 0,
+  qty_after: available
+}]);
+  }
+
+  localStorage.removeItem("excelPreview");
+
+  loadStock();
 }
 
 /* INIT */
