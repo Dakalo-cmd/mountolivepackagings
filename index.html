@@ -11,27 +11,155 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
-body { font-family: Arial; margin: 0; background: #1f8f4e; color: #b88a4a; }
-header { background: #1f8f4e; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #b88a4a; }
-.logo { height: 45px; }
-.container { padding: 15px; }
-.card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 10px; color: #6b4226; }
-input, button { padding: 10px; margin: 5px 0; border-radius: 5px; width: 100%; box-sizing: border-box; }
-button { background: #b88a4a; color: white; border: none; cursor: pointer; }
-table { width: 100%; border-collapse: collapse; }
-th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-.hidden { display: none; }
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  font-family:Arial,sans-serif;
+  background:#1f8f4e;
+  color:#b88a4a;
+}
+
+header{
+  background:#1f8f4e;
+  padding:15px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:2px solid #b88a4a;
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+.logo{
+  height:45px;
+}
+
+.container{
+  padding:15px;
+  width:100%;
+}
+
+.card{
+  background:white;
+  padding:15px;
+  margin-bottom:15px;
+  border-radius:10px;
+  color:#6b4226;
+  overflow-x:auto;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+
+input,
+button{
+  padding:10px;
+  margin:5px 0;
+  border-radius:5px;
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid #ccc;
+  font-size:14px;
+}
+
+button{
+  background:#b88a4a;
+  color:white;
+  border:none;
+  cursor:pointer;
+}
+
+button:hover{
+  opacity:0.9;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:850px;
+}
+
+th,
+td{
+  border:1px solid #ddd;
+  padding:10px;
+  text-align:center;
+}
+
+th{
+  background:#f5f5f5;
+}
+
+td input{
+  min-width:90px;
+}
+
+.hidden{
+  display:none;
+}
+
+#loginPage{
+  max-width:320px;
+  margin:100px auto;
+  text-align:center;
+}
+
+@media screen and (max-width:768px){
+
+  header{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+
+  table{
+    min-width:700px;
+  }
+
+  th,
+  td{
+    font-size:12px;
+    padding:8px;
+  }
+
+  td input{
+    min-width:75px;
+    font-size:12px;
+  }
+}
+
+@media screen and (max-width:480px){
+
+  table{
+    min-width:650px;
+  }
+
+  th,
+  td{
+    font-size:11px;
+    padding:6px;
+  }
+
+  td input{
+    min-width:65px;
+  }
+}
+
 </style>
 </head>
 
 <body>
 
 <!-- LOGIN -->
-<div id="loginPage" class="card" style="max-width:300px;margin:100px auto;text-align:center;">
+<div id="loginPage" class="card">
   <img src="MountOlive Logo.jpg" width="120">
   <h2>Admin Login</h2>
+
   <input type="email" id="email" placeholder="Email">
   <input type="password" id="password" placeholder="Password">
+
   <button onclick="login()">Login</button>
 </div>
 
@@ -39,43 +167,70 @@ th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
 <div id="dashboard" class="hidden">
 
 <header>
+
   <div style="display:flex;align-items:center;gap:10px;">
     <img src="MountOlive Logo.jpg" class="logo">
     <h2>MountOlive Admin</h2>
   </div>
-  <button onclick="logout()">Logout</button>
+
+  <button style="width:auto;" onclick="logout()">Logout</button>
+
 </header>
 
 <div class="container">
 
+<!-- ADD STOCK -->
 <div class="card">
+
   <h3>Add Stock</h3>
+
   <input id="itemName" placeholder="Name">
   <input id="itemRef" placeholder="Ref Nr">
   <input id="itemSupplier" placeholder="Supplier">
   <input id="itemSize" placeholder="Size">
   <input id="qtyStock" type="number" placeholder="Qty Stock Available">
+
   <button onclick="addStock()">Add</button>
+
 </div>
 
+<!-- IMPORT EXPORT -->
 <div class="card">
+
   <h3>Import / Export</h3>
+
   <input type="file" id="fileInput">
+
   <button onclick="previewExcel()">Preview Excel</button>
-  <button onclick="saveExcelToDB()">Save To Database</button> 
+  <button onclick="saveExcelToDB()">Save To Database</button>
   <button onclick="exportExcel()">Export Excel</button>
   <button onclick="exportMonthlyHistory()">Export Monthly History</button>
+
 </div>
 
+<!-- SEARCH -->
 <div class="card">
+
   <h3>Search Stock</h3>
-  <input type="text" id="searchBox" placeholder="Search..." onkeyup="filterStock()">
+
+  <input
+    type="text"
+    id="searchBox"
+    placeholder="Search..."
+    onkeyup="filterStock()"
+  >
+
   <button onclick="resetSearch()">Reset Search</button>
+
 </div>
 
+<!-- STOCK TABLE -->
 <div class="card">
+
   <h3>Stock List</h3>
+
   <table>
+
     <thead>
       <tr>
         <th>Name</th>
@@ -87,13 +242,20 @@ th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         <th>Action</th>
       </tr>
     </thead>
+
     <tbody id="stockTable"></tbody>
+
   </table>
+
 </div>
 
+<!-- HISTORY -->
 <div class="card">
+
   <h3>Stock History</h3>
+
   <table>
+
     <thead>
       <tr>
         <th>Name</th>
@@ -103,14 +265,18 @@ th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         <th>Date</th>
       </tr>
     </thead>
+
     <tbody id="historyTable"></tbody>
+
   </table>
+
 </div>
 
 </div>
 </div>
 
 <script>
+
 const { createClient } = supabase;
 
 const db = createClient(
@@ -127,6 +293,7 @@ const historyTable = document.getElementById("historyTable");
 
 /* LOGIN */
 async function login() {
+
   const { error } = await db.auth.signInWithPassword({
     email: email.value,
     password: password.value
@@ -143,7 +310,9 @@ async function login() {
 
 /* LOGOUT */
 async function logout() {
+
   await db.auth.signOut();
+
   location.reload();
 }
 
@@ -187,37 +356,70 @@ async function addStock() {
 /* LOAD STOCK */
 async function loadStock() {
 
-  // 🔥 RESTORE EXCEL PREVIEW IF EXISTS
-  const saved = localStorage.getItem("excelPreview");
-
-  if (saved) {
-    excelPreviewData = JSON.parse(saved);
-    renderExcelPreview(excelPreviewData);
-    return;
-  }
-
   const { data } = await db.from("stocks").select("*");
+
   stockData = data || [];
+
   renderStock(stockData);
 }
 
 /* NORMAL STOCK */
 function renderStock(data) {
+
   stockTable.innerHTML = "";
 
   data.forEach(item => {
+
     stockTable.innerHTML += `
       <tr>
-        <td><input id="n${item.id}" value="${item.name || ""}"></td>
-        <td><input id="r${item.id}" value="${item.ref || ""}"></td>
-        <td><input id="s${item.id}" value="${item.supplier || ""}"></td>
-        <td><input id="a${item.id}" type="number" value="${item.qty_stock_available || 0}"></td>
-        <td><input id="o${item.id}" type="number" value="0"></td>
-        <td><input id="z${item.id}" value="${item.size || ""}"></td>
+
         <td>
-          <button onclick="updateStock('${item.id}')">Update</button>
-          <button onclick="deleteStock('${item.id}')" style="background:red;margin-top:5px;">Delete</button>
+          <input id="n${item.id}" value="${item.name || ""}">
         </td>
+
+        <td>
+          <input id="r${item.id}" value="${item.ref || ""}">
+        </td>
+
+        <td>
+          <input id="s${item.id}" value="${item.supplier || ""}">
+        </td>
+
+        <td>
+          <input
+            id="a${item.id}"
+            type="number"
+            value="${item.qty_stock_available || 0}"
+          >
+        </td>
+
+        <td>
+          <input
+            id="o${item.id}"
+            type="number"
+            value="0"
+          >
+        </td>
+
+        <td>
+          <input id="z${item.id}" value="${item.size || ""}">
+        </td>
+
+        <td>
+
+          <button onclick="updateStock('${item.id}')">
+            Update
+          </button>
+
+          <button
+            onclick="deleteStock('${item.id}')"
+            style="background:red;margin-top:5px;"
+          >
+            Delete
+          </button>
+
+        </td>
+
       </tr>
     `;
   });
@@ -225,7 +427,9 @@ function renderStock(data) {
 
 /* DELETE */
 async function deleteStock(id) {
+
   await db.from("stocks").delete().eq("id", id);
+
   loadStock();
 }
 
@@ -240,12 +444,19 @@ async function updateStock(id) {
   const available = parseInt(document.getElementById("a"+id).value) || 0;
   const order = parseInt(document.getElementById("o"+id).value) || 0;
 
-  const { data: existing } = await db.from("stocks").select("*").eq("id", id).single();
+  const { data: existing } = await db
+    .from("stocks")
+    .select("*")
+    .eq("id", id)
+    .single();
 
   let qtyAfter = available;
 
   if (order > 0) {
-    if (order > existing.qty_stock_available) return alert("Order too high");
+
+    if (order > existing.qty_stock_available) {
+      return alert("Order too high");
+    }
 
     qtyAfter = existing.qty_stock_available - order;
 
@@ -259,7 +470,10 @@ async function updateStock(id) {
   }
 
   await db.from("stocks").update({
-    name, ref, supplier, size,
+    name,
+    ref,
+    supplier,
+    size,
     qty_stock_available: qtyAfter
   }).eq("id", id);
 
@@ -269,11 +483,16 @@ async function updateStock(id) {
 
 /* HISTORY */
 async function loadHistory() {
-  const { data } = await db.from("stock_history").select("*").order("created_at", { ascending: false });
+
+  const { data } = await db
+    .from("stock_history")
+    .select("*")
+    .order("created_at", { ascending: false });
 
   historyTable.innerHTML = "";
 
   (data || []).forEach(h => {
+
     historyTable.innerHTML += `
       <tr>
         <td>${h.name}</td>
@@ -288,50 +507,78 @@ async function loadHistory() {
 
 /* SEARCH */
 function filterStock() {
+
   const value = searchBox.value.toLowerCase();
+
   const rows = document.querySelectorAll("#stockTable tr");
 
   rows.forEach(row => {
+
     const inputs = row.querySelectorAll("input");
+
     const name = inputs[0].value.toLowerCase();
     const ref = inputs[1].value.toLowerCase();
-    row.style.display = name.includes(value) || ref.includes(value) ? "" : "none";
+
+    row.style.display =
+      name.includes(value) || ref.includes(value)
+      ? ""
+      : "none";
   });
 }
 
+/* RESET SEARCH */
 function resetSearch() {
+
   searchBox.value = "";
-  document.querySelectorAll("#stockTable tr").forEach(r => r.style.display = "");
+
+  document.querySelectorAll("#stockTable tr")
+    .forEach(r => r.style.display = "");
 }
 
 /* EXCEL PREVIEW */
-function previewExcel() {
+async function previewExcel() {
 
   const file = document.getElementById("fileInput").files[0];
+
   if (!file) return alert("Select Excel file");
 
   const reader = new FileReader();
 
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
 
     const data = new Uint8Array(e.target.result);
+
     const workbook = XLSX.read(data, { type: "array" });
 
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
     const rows = XLSX.utils.sheet_to_json(sheet);
 
     excelPreviewData = rows;
 
-    // 🔥 SAVE FOR REFRESH
-    localStorage.setItem("excelPreview", JSON.stringify(rows));
-
     renderExcelPreview(rows);
+
+    // SAVE TO DATABASE FOR ALL DEVICES
+    for (const r of rows) {
+
+      await db.from("stocks").upsert([{
+        name: r.Name || "",
+        ref: r.Ref || "",
+        supplier: r.Supplier || "",
+        size: r.Size || "",
+        qty_stock_available: parseInt(r.Available) || 0
+      }], {
+        onConflict: "ref"
+      });
+    }
+
+    loadStock();
   };
 
   reader.readAsArrayBuffer(file);
 }
 
-/* RENDER EXCEL (WITH ALL BUTTONS BACK) */
+/* RENDER EXCEL */
 function renderExcelPreview(rows) {
 
   stockTable.innerHTML = "";
@@ -340,26 +587,67 @@ function renderExcelPreview(rows) {
 
     stockTable.innerHTML += `
       <tr>
-        <td><input id="ex_name_${i}" value="${r.Name || ""}"></td>
-        <td><input id="ex_ref_${i}" value="${r.Ref || ""}"></td>
-        <td><input id="ex_supplier_${i}" value="${r.Supplier || ""}"></td>
-        <td><input id="ex_available_${i}" type="number" value="${r.Available || 0}"></td>
-        <td><input id="ex_order_${i}" type="number" value="0"></td>
-        <td><input id="ex_size_${i}" value="${r.Size || ""}"></td>
+
         <td>
-          <button onclick="updatePreviewRow(${i})">Update</button>
-          <button onclick="deletePreviewRow(${i})" style="background:red;margin-top:5px;">Delete</button>
+          <input id="ex_name_${i}" value="${r.Name || ""}">
         </td>
+
+        <td>
+          <input id="ex_ref_${i}" value="${r.Ref || ""}">
+        </td>
+
+        <td>
+          <input id="ex_supplier_${i}" value="${r.Supplier || ""}">
+        </td>
+
+        <td>
+          <input
+            id="ex_available_${i}"
+            type="number"
+            value="${r.Available || 0}"
+          >
+        </td>
+
+        <td>
+          <input
+            id="ex_order_${i}"
+            type="number"
+            value="0"
+          >
+        </td>
+
+        <td>
+          <input id="ex_size_${i}" value="${r.Size || ""}">
+        </td>
+
+        <td>
+
+          <button onclick="updatePreviewRow(${i})">
+            Update
+          </button>
+
+          <button
+            onclick="deletePreviewRow(${i})"
+            style="background:red;margin-top:5px;"
+          >
+            Delete
+          </button>
+
+        </td>
+
       </tr>
     `;
   });
 }
 
-/* UPDATE PREVIEW (CLEAN + SAVE STOCK + HISTORY ONCE) */
+/* UPDATE PREVIEW */
 async function updatePreviewRow(i) {
 
-  const available = parseInt(document.getElementById("ex_available_" + i).value) || 0;
-  const order = parseInt(document.getElementById("ex_order_" + i).value) || 0;
+  const available =
+    parseInt(document.getElementById("ex_available_" + i).value) || 0;
+
+  const order =
+    parseInt(document.getElementById("ex_order_" + i).value) || 0;
 
   if (order > available) return alert("Order too high");
 
@@ -368,12 +656,11 @@ async function updatePreviewRow(i) {
   document.getElementById("ex_available_" + i).value = newVal;
 
   excelPreviewData[i].Available = newVal;
-  localStorage.setItem("excelPreview", JSON.stringify(excelPreviewData));
 
   const name = document.getElementById("ex_name_" + i).value;
+
   const ref = document.getElementById("ex_ref_" + i).value;
 
-  // get real stock
   const { data: existing } = await db
     .from("stocks")
     .select("*")
@@ -381,8 +668,7 @@ async function updatePreviewRow(i) {
     .maybeSingle();
 
   if (!existing) {
-    alert("Stock not found in database");
-    return;
+    return alert("Stock not found in database");
   }
 
   const qty_before = existing.qty_stock_available;
@@ -393,14 +679,12 @@ async function updatePreviewRow(i) {
     return alert("Not enough stock in database");
   }
 
-  // update stock
   await db.from("stocks")
     .update({
       qty_stock_available: finalQty
     })
     .eq("id", existing.id);
 
-  // insert history ONLY ONCE
   await db.from("stock_history").insert([{
     stock_id: existing.id,
     name,
@@ -408,11 +692,16 @@ async function updatePreviewRow(i) {
     qty_ordered: order,
     qty_after: finalQty
   }]);
+
+  loadStock();
+  loadHistory();
 }
+
 /* DELETE PREVIEW */
 function deletePreviewRow(i) {
+
   excelPreviewData.splice(i, 1);
-  localStorage.setItem("excelPreview", JSON.stringify(excelPreviewData));
+
   renderExcelPreview(excelPreviewData);
 }
 
@@ -422,9 +711,15 @@ async function saveExcelToDB() {
   for (let i = 0; i < excelPreviewData.length; i++) {
 
     const name = document.getElementById("ex_name_"+i).value;
+
     const ref = document.getElementById("ex_ref_"+i).value;
+
     const supplier = document.getElementById("ex_supplier_"+i).value;
-    const available = parseInt(document.getElementById("ex_available_"+i).value) || 0;
+
+    const size = document.getElementById("ex_size_"+i).value;
+
+    const available =
+      parseInt(document.getElementById("ex_available_"+i).value) || 0;
 
     if (!name || !ref) continue;
 
@@ -432,29 +727,43 @@ async function saveExcelToDB() {
       name,
       ref,
       supplier,
-      size: "",
+      size,
       qty_stock_available: available
-    }], { onConflict: "ref" });
-	
-await db.from("stock_history").insert([{
-  stock_id: null, // or fetch real ID if you want linking
-  name,
-  qty_before: 0,
-  qty_ordered: 0,
-  qty_after: available
-}]);
+    }], {
+      onConflict: "ref"
+    });
+
+    await db.from("stock_history").insert([{
+      stock_id: null,
+      name,
+      qty_before: 0,
+      qty_ordered: 0,
+      qty_after: available
+    }]);
   }
 
-  localStorage.removeItem("excelPreview");
-
   loadStock();
+  loadHistory();
+
+  alert("Saved successfully");
+}
+
+/* EMPTY EXPORTS TO KEEP BUTTONS */
+function exportExcel(){
+  alert("Export function still here");
+}
+
+function exportMonthlyHistory(){
+  alert("Monthly export function still here");
 }
 
 /* INIT */
 window.onload = () => {
+
   loadStock();
   loadHistory();
 };
+
 </script>
 
 </body>
