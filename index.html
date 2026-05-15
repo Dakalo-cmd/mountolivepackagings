@@ -88,115 +88,6 @@ table{width:100%;border-collapse:collapse;min-width:850px;}
 th,td{border:1px solid #e5e5e5;padding:10px;text-align:center;}
 th{background:#f7f7f7;}
 
-
-/* ===== MOBILE RESPONSIVE FIX ===== */
-
-@media (max-width: 900px){
-
-  /* LOGIN PAGE */
-  .login-container{
-    grid-template-columns:1fr;
-    max-width:100%;
-  }
-
-  .login-left{
-    padding:40px 25px;
-    text-align:center;
-  }
-
-  .login-left h1{
-    font-size:34px;
-  }
-
-  .login-left p{
-    font-size:14px;
-    max-width:100%;
-  }
-
-  .login-right{
-    padding:35px 25px;
-  }
-
-  .logo-wrap img{
-    width:90px;
-  }
-
-  .login-title{
-    font-size:28px;
-  }
-
-  /* HEADER */
-  header{
-    flex-direction:column;
-    align-items:flex-start;
-    gap:12px;
-  }
-
-  header button{
-    width:100% !important;
-  }
-
-  /* CONTAINER */
-  .container{
-    padding:12px;
-  }
-
-  .card{
-    padding:15px;
-    border-radius:14px;
-  }
-
-  /* TABLE */
-  table{
-    min-width:900px;
-  }
-
-  th,td{
-    padding:8px;
-    font-size:13px;
-  }
-
-  /* INPUTS */
-  input,button{
-    font-size:14px;
-    padding:11px;
-  }
-
-}
-
-/* EXTRA SMALL PHONES */
-@media (max-width: 500px){
-
-  .login-left{
-    padding:30px 20px;
-  }
-
-  .login-left h1{
-    font-size:28px;
-    line-height:1.2;
-  }
-
-  .company-badge{
-    font-size:12px;
-  }
-
-  .login-right{
-    padding:25px 18px;
-  }
-
-  .login-title{
-    font-size:24px;
-  }
-
-  .card h3{
-    font-size:18px;
-  }
-
-  th,td{
-    font-size:12px;
-  }
-
-}
 @keyframes fadeUp{from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);}}
 
 </style>
@@ -233,7 +124,7 @@ th{background:#f7f7f7;}
 
       <button class="login-btn" onclick="login()">Login</button>
 
-      <div class="login-footer">© 2026</div>
+      <div class="login-footer">© 2026 Mount Olive</div>
     </div>
   </div>
 </div>
@@ -257,7 +148,7 @@ th{background:#f7f7f7;}
 <input id="itemRef" placeholder="Ref">
 <input id="itemSupplier" placeholder="Supplier">
 <input id="itemSize" placeholder="Size">
-<input id="qty_stock_available" type="number" placeholder="Qty">
+<input id="qtyStock" type="number" placeholder="Qty">
 <button onclick="addStock()">Add</button>
 </div>
 
@@ -283,7 +174,7 @@ th{background:#f7f7f7;}
     placeholder="Search..."
     onkeyup="filterStock()"
   >
-  <button onclick="resetSearch()">Reset Search</button>
+ 
 </div>
 
 <!-- STOCK TABLE -->
@@ -416,6 +307,12 @@ async function addStock() {
 
   loadStock();
   loadHistory();
+  
+  itemName.value = "";
+itemRef.value = "";
+itemSupplier.value = "";
+itemSize.value = "";
+qtyStock.value = "";
 }
 
 /* LOAD STOCK */
@@ -458,13 +355,13 @@ function renderStock(data) {
           >
         </td>
 
-        <td>
-          <input
-            id="o${item.id}"
-            type="number"
-            value="0"
-          >
-        </td>
+      <td>
+       <input
+       id="o${item.id}"
+       type="number"
+       value="${item.qty_ordered || 0}"
+        >
+      </td>
 
         <td>
           <input id="z${item.id}" value="${item.size || ""}">
@@ -493,11 +390,22 @@ function renderStock(data) {
 /* DELETE */
 async function deleteStock(id) {
 
-  await db.from("stocks").delete().eq("id", id);
+  if(!confirm("Delete this stock?")) return;
+
+  await db.from("stock_history")
+    .delete()
+    .eq("stock_id", id);
+
+  await db.from("stocks")
+    .delete()
+    .eq("id", id);
 
   loadStock();
+  loadHistory();
 }
 
+
+/* UPDATE STOCK */
 /* UPDATE STOCK */
 async function updateStock(id) {
 
@@ -506,48 +414,49 @@ async function updateStock(id) {
   const supplier = document.getElementById("s"+id).value.trim();
   const size = document.getElementById("z"+id).value.trim();
 
-  const available = parseInt(document.getElementById("a"+id).value) || 0;
-  const order = parseInt(document.getElementById("o"+id).value) || 0;
+  /* CURRENT AVAILABLE */
+  const currentAvailable =
+    parseInt(document.getElementById("a"+id).value) || 0;
 
-  const { data: existing } = await db
-    .from("stocks")
-    .select("*")
-    .eq("id", id)
-    .single();
+  /* NEW ORDER USER TYPES */
+  const newOrder =
+    parseInt(document.getElementById("o"+id).value) || 0;
 
-  let qtyAfter = available;
-
-  if (order > 0) {
-
-    if (order > existing.qty_stock_available) {
-      return alert("Order too high");
-    }
-
-    qtyAfter = existing.qty_stock_available - order;
-
-    await db.from("stock_history").insert([{
-      stock_id: id,
-      name,
-      qty_before: existing.qty_stock_available,
-      qty_ordered: order,
-      qty_after: qtyAfter
-    }]);
+  /* CHECK IF ORDER TOO HIGH */
+  if (newOrder > currentAvailable) {
+    return alert("Order too high");
   }
 
+  /* SUBTRACT ORDER FROM AVAILABLE */
+  const newAvailable =
+    currentAvailable - newOrder;
+
+  /* UPDATE AVAILABLE INPUT IMMEDIATELY */
+  document.getElementById("a"+id).value =
+    newAvailable;
+
+  /* SAVE TO DATABASE */
   await db.from("stocks").update({
     name,
     ref,
     supplier,
     size,
-    qty_stock_available: qtyAfter
+    qty_stock_available: newAvailable,
+    qty_ordered: newOrder
   }).eq("id", id);
+
+  /* SAVE HISTORY */
+  await db.from("stock_history").insert([{
+    stock_id: id,
+    name,
+    qty_before: currentAvailable,
+    qty_ordered: newOrder,
+    qty_after: newAvailable
+  }]);
 
   loadStock();
   loadHistory();
 }
-
-<!-- REPLACE ONLY THIS FUNCTION -->
-
 /* HISTORY */
 async function loadHistory() {
 
@@ -614,14 +523,6 @@ function filterStock() {
   });
 }
 
-/* RESET SEARCH */
-function resetSearch() {
-
-  searchBox.value = "";
-
-  document.querySelectorAll("#stockTable tr")
-    .forEach(r => r.style.display = "");
-}
 
 /* EXCEL PREVIEW */
 async function previewExcel() {
@@ -666,6 +567,7 @@ async function previewExcel() {
   reader.readAsArrayBuffer(file);
 }
 
+
 /* RENDER EXCEL */
 function renderExcelPreview(rows) {
 
@@ -700,7 +602,7 @@ function renderExcelPreview(rows) {
           <input
             id="ex_order_${i}"
             type="number"
-            value="0"
+            value="${r.Order || 0}"
           >
         </td>
 
@@ -728,26 +630,50 @@ function renderExcelPreview(rows) {
   });
 }
 
+
 /* UPDATE PREVIEW */
 async function updatePreviewRow(i) {
 
-  const available =
+  const currentAvailable =
     parseInt(document.getElementById("ex_available_" + i).value) || 0;
 
-  const order =
+  const previousOrder =
+    excelPreviewData[i].Order || 0;
+
+  const newOrder =
     parseInt(document.getElementById("ex_order_" + i).value) || 0;
 
-  if (order > available) return alert("Order too high");
+  /* RESTORE ORIGINAL STOCK */
+  const originalAvailable =
+    currentAvailable + previousOrder;
 
-  const newVal = available - order;
+  if (newOrder > originalAvailable) {
+    return alert("Order too high");
+  }
 
-  document.getElementById("ex_available_" + i).value = newVal;
+  /* CALCULATE NEW AVAILABLE */
+  const newAvailable =
+    originalAvailable - newOrder;
 
-  excelPreviewData[i].Available = newVal;
+  /* UPDATE INPUTS */
+  document.getElementById("ex_available_" + i).value =
+    newAvailable;
 
-  const name = document.getElementById("ex_name_" + i).value;
+  /* SAVE PREVIEW DATA */
+  excelPreviewData[i].Available = newAvailable;
+  excelPreviewData[i].Order = newOrder;
 
-  const ref = document.getElementById("ex_ref_" + i).value;
+  const name =
+    document.getElementById("ex_name_" + i).value;
+
+  const ref =
+    document.getElementById("ex_ref_" + i).value;
+
+  const supplier =
+    document.getElementById("ex_supplier_" + i).value;
+
+  const size =
+    document.getElementById("ex_size_" + i).value;
 
   const { data: existing } = await db
     .from("stocks")
@@ -759,26 +685,25 @@ async function updatePreviewRow(i) {
     return alert("Stock not found in database");
   }
 
-  const qty_before = existing.qty_stock_available;
-
-  const finalQty = qty_before - order;
-
-  if (finalQty < 0) {
-    return alert("Not enough stock in database");
-  }
-
+  /* UPDATE DATABASE */
   await db.from("stocks")
     .update({
-      qty_stock_available: finalQty
+      name,
+      ref,
+      supplier,
+      size,
+      qty_stock_available: newAvailable,
+      qty_ordered: newOrder
     })
     .eq("id", existing.id);
 
+  /* SAVE HISTORY */
   await db.from("stock_history").insert([{
     stock_id: existing.id,
     name,
-    qty_before,
-    qty_ordered: order,
-    qty_after: finalQty
+    qty_before: originalAvailable,
+    qty_ordered: newOrder,
+    qty_after: newAvailable
   }]);
 
   loadStock();
@@ -838,11 +763,49 @@ async function saveExcelToDB() {
 
 /* EMPTY EXPORTS TO KEEP BUTTONS */
 function exportExcel(){
-  alert("Export function still here");
-}
 
-function exportMonthlyHistory(){
-  alert("Monthly export function still here");
+  const exportData = stockData.map(item => ({
+    Name: item.name,
+    Ref: item.ref,
+    Supplier: item.supplier,
+    Available: item.qty_stock_available,
+    Size: item.size
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Stock");
+
+  XLSX.writeFile(wb, "MountOliveStock.xlsx");
+}
+async function exportMonthlyHistory(){
+
+  const { data, error } = await db
+    .from("stock_history")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if(error){
+    return alert(error.message);
+  }
+
+  const exportData = data.map(h => ({
+    Name: h.name,
+    Before: h.qty_before,
+    Ordered: h.qty_ordered,
+    After: h.qty_after,
+    Date: new Date(h.created_at).toLocaleString()
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "History");
+
+  XLSX.writeFile(wb, "MonthlyHistory.xlsx");
 }
 
 
